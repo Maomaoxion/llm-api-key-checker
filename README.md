@@ -136,9 +136,11 @@ LLM API KEY 检测工具 是一个基于 Cloudflare Workers 的 Web 工具，用
 
 更多详情见源代码注释。
 
-## 贡献
+## 特别鸣谢
 
-欢迎 Pull Request！提交 Issue 或贡献代码以添加提供商/修复 Bug。
+[LLM API 代理](https://api-proxy.me)
+
+[hzruo/keycheck](https://github.com/hzruo/keycheck)
 
 ## 许可
 
