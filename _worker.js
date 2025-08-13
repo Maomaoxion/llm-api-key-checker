@@ -2034,9 +2034,23 @@ const htmlContent = `<!DOCTYPE html>
         });
         if (balanceResponse.ok) {
           const data = await balanceResponse.json();
-          const balanceInfo = data.balance_infos?.find(b => b.currency === 'USD') || data.balance_infos?.[0];
-          const balance = balanceInfo ? parseFloat(balanceInfo.total_balance) : -1;
-          return { token, isValid: true, balance };
+          // 优先使用 USD，其次 CNY，最后其他币种
+          const usdInfo = data.balance_infos?.find(b => b.currency === 'USD');
+          const cnyInfo = data.balance_infos?.find(b => b.currency === 'CNY');
+          const balanceInfo = usdInfo || cnyInfo || data.balance_infos?.[0];
+      
+          if (balanceInfo) {
+            const balance = parseFloat(balanceInfo.total_balance);
+            return { 
+              token, 
+              isValid: true, 
+              balance: balance,
+              currency: balanceInfo.currency,  // 添加币种信息
+              grantedBalance: parseFloat(balanceInfo.granted_balance || 0),
+              toppedUpBalance: parseFloat(balanceInfo.topped_up_balance || 0)
+            };
+          }
+          return { token, isValid: true, balance: -1, message: "有效但无法获取余额" };
         }
         return { token, isValid: true, balance: -1, message: "有效但无法获取余额" };
       } catch (error) { 
@@ -2256,7 +2270,25 @@ const htmlContent = `<!DOCTYPE html>
         });
         actionsDiv.appendChild(detailsBtn);
       }
-
+// DeepSeek 特殊处理 - 添加这部分
+if (currentProvider === 'deepseek' && res.currency) {
+  const detailsBtn = document.createElement('button');
+  detailsBtn.className = 'view-details-btn';
+  detailsBtn.innerHTML = '💰';
+  detailsBtn.title = '查看余额详情';
+  detailsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    let details = \`币种: \${res.currency}\\n总余额: \${res.balance} \${res.currency}\`;
+    if (res.grantedBalance !== undefined) {
+      details += \`\\n赠送余额: \${res.grantedBalance} \${res.currency}\`;
+    }
+    if (res.toppedUpBalance !== undefined) {
+      details += \`\\n充值余额: \${res.toppedUpBalance} \${res.currency}\`;
+    }
+    showCustomModal(details, 'info', 'DeepSeek 余额详情');
+  });
+  actionsDiv.appendChild(detailsBtn);
+}
       // 错误详情按钮
       if ((category === 'invalid' || category === 'rateLimit') && res.rawError) {
         const viewErrorBtn = document.createElement('button');
@@ -2365,13 +2397,13 @@ const htmlContent = `<!DOCTYPE html>
         const progress = Math.round((completedCount / uniqueTokens.length) * 100);
         progressBar.style.width = progress + '%';
         progressText.textContent = \`\${completedCount} / \${uniqueTokens.length} (\${progress}%)\`;
-        
+  
         let category, displayText;
         if (!res || res.error || !res.isValid) {
           const fullMessage = (res && res.message) ? res.message : (res && res.error ? "请求失败: " + res.error : "未知错误");
-          
+    
           category = fullMessage.toLowerCase().includes("rate limit") || fullMessage.includes("429") ? 'rateLimit' : 'invalid';
-          
+    
           let simpleMessage = "验证失败";
           if (category === 'rateLimit') {
             simpleMessage = "请求频繁";
@@ -2388,24 +2420,35 @@ const htmlContent = `<!DOCTYPE html>
           if (config.hasBalance) {
             const bal = res.balance;
             const balClass = bal >= 10 ? 'high' : (bal > 0 ? 'medium' : 'low');
-            
-            // OpenRouter 特殊显示
-            if (currentProvider === 'openrouter' && res.totalBalance !== undefined) {
-              displayText = \`\${res.token} <span class="message">(余额: <span class="balance-\${balClass}">\${bal} / \${res.totalBalance}</span>)</span>\`;
-            } else {
-              displayText = \`\${res.token} <span class="message">(余额: <span class="balance-\${balClass}">\${bal}</span>)</span>\`;
-            }
-            
-            if (bal === 0) category = 'zeroBalance';
-            else if (bal < threshold) category = 'lowBalance';
-            else category = 'valid';
-          } else {
-            displayText = \`\${res.token} <span class="message">(状态: 有效)</span>\`;
-            category = 'valid';
+      
+          // 处理币种显示
+          let balanceDisplay = bal.toString();
+          if (res.currency) {
+            // 如果有币种信息，添加到显示中
+            balanceDisplay = \`\${bal} \${res.currency}\`;
           }
+      
+          // OpenRouter 特殊显示
+          if (currentProvider === 'openrouter' && res.totalBalance !== undefined) {
+            displayText = \`\${res.token} <span class="message">(余额: <span class="balance-\${balClass}">\${bal} / \${res.totalBalance}</span>)</span>\`;
+          } else if (res.currency) {
+            // 有币种信息的显示方式
+            displayText = \`\${res.token} <span class="message">(余额: <span class="balance-\${balClass}">\${balanceDisplay}</span>)</span>\`;
+          } else {
+            // 默认显示方式
+            displayText = \`\${res.token} <span class="message">(余额: <span class="balance-\${balClass}">\${bal}</span>)</span>\`;
+          }
+      
+          if (bal === 0) category = 'zeroBalance';
+          else if (bal < threshold) category = 'lowBalance';
+          else category = 'valid';
+        } else {
+          displayText = \`\${res.token} <span class="message">(状态: 有效)</span>\`;
+          category = 'valid';
         }
-        addResultLine(res, displayText, category);
       }
+      addResultLine(res, displayText, category);
+    }
 
       try {
         await runWithConcurrencyLimit(tasks, concurrency, onSingleResult);
