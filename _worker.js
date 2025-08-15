@@ -1,4 +1,5 @@
 // API Key Checker 是一个基于 Cloudflare Workers 的 Web 工具，用于批量检测各种 AI API 提供商（如 OpenAI、Anthropic、Google Gemini 等）的 API Key 是否有效。它支持余额查询、模型列表获取，并提供现代化的 UI 界面，帮助用户快速验证和分类 Key。
+// version 1.0.1 修复 429 判断错误、修复 openrouter 渠道 gpt-5 模型检验错误
 
 addEventListener("fetch", event => {
   event.respondWith(handleRequest(event.request));
@@ -1902,7 +1903,7 @@ const htmlContent = `<!DOCTYPE html>
           body: JSON.stringify({ 
             model: model, 
             messages: [{ role: "user", content: "Hi" }], 
-            max_tokens: 1 
+            max_tokens: 16 
           }) 
         });
         if (!validationResponse.ok) {
@@ -2402,7 +2403,8 @@ if (currentProvider === 'deepseek' && res.currency) {
         if (!res || res.error || !res.isValid) {
           const fullMessage = (res && res.message) ? res.message : (res && res.error ? "请求失败: " + res.error : "未知错误");
     
-          category = fullMessage.toLowerCase().includes("rate limit") || fullMessage.includes("429") ? 'rateLimit' : 'invalid';
+          const lowerCaseMessage = fullMessage.toLowerCase();
+          category = lowerCaseMessage.includes("rate") || lowerCaseMessage.includes("quota") || fullMessage.includes("429") ? 'rateLimit' : 'invalid';
     
           let simpleMessage = "验证失败";
           if (category === 'rateLimit') {
