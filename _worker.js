@@ -1434,7 +1434,7 @@ const htmlContent = `<!DOCTYPE html>
         label: 'Google Gemini',
         icon: '✨',
         hasBalance: false,
-        defaultBase: 'https://api-proxy.me/gemini',
+        defaultBase: 'https://generativelanguage.googleapis.com/v1beta',
         defaultModel: 'gemini-2.5-flash',
         checkFunction: 'checkGeminiToken',
         fetchModels: 'fetchGoogleModels'
